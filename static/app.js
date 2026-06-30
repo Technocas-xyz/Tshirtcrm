@@ -6,6 +6,129 @@ let activeOrderOid = null;
 // ─── Utils ───────────────────────────────────────────────────────────────────
 const el = id => document.getElementById(id);
 
+// ─── Chinese to English Translation ─────────────────────────────────────────
+const ZH_EN_MAP = {
+  // Garment styles
+  '休闲短裤': 'Casual Shorts',
+  '水洗纯棉棒球帽': 'Washed Cotton Baseball Cap',
+  '带帽无袖裙子': 'Hooded Sleeveless Dress',
+  '斜肩女T': 'Off-Shoulder Women\'s Tee',
+  '高弹力露脐女T': 'Crop Top Stretch Women\'s Tee',
+  '女款连帽夹克': 'Women\'s Hooded Jacket',
+  '女款立领夹克': 'Women\'s Stand Collar Jacket',
+  '男款大码连帽夹克': 'Men\'s Plus Size Hooded Jacket',
+  '男款大码立领夹克': 'Men\'s Plus Size Stand Collar Jacket',
+  '男款连帽夹克': 'Men\'s Hooded Jacket',
+  '男款立领夹克': 'Men\'s Stand Collar Jacket',
+  '棒球帽': 'Baseball Cap',
+  '长款爬服': 'Long Romper',
+  '吉尔丹': 'Gildan',
+  '圆领短袖T恤': 'Crew Neck Short Sleeve T-Shirt',
+  '圆领': 'Crew Neck',
+  '短袖T恤': 'Short Sleeve T-Shirt',
+  '长袖T恤': 'Long Sleeve T-Shirt',
+  '连帽卫衣': 'Hooded Sweatshirt',
+  '圆领卫衣': 'Crew Neck Sweatshirt',
+  '拉链卫衣': 'Zip Hoodie',
+  '背心': 'Tank Top',
+  '短裤': 'Shorts',
+  '长裤': 'Long Pants',
+  '帽子': 'Hat',
+  '围裙': 'Apron',
+  '抱枕': 'Pillow',
+  '帆布袋': 'Canvas Bag',
+  '手机壳': 'Phone Case',
+  '马克杯': 'Mug',
+  '鼠标垫': 'Mouse Pad',
+  '婴儿连体衣': 'Baby Onesie',
+  '儿童T恤': 'Kids T-Shirt',
+  '女款T恤': 'Women\'s T-Shirt',
+  '男款T恤': 'Men\'s T-Shirt',
+  '宽松T恤': 'Oversized T-Shirt',
+  '修身T恤': 'Slim Fit T-Shirt',
+  'V领T恤': 'V-Neck T-Shirt',
+  'POLO衫': 'Polo Shirt',
+  'polo衫': 'Polo Shirt',
+
+  // Craft types
+  '烫画': 'Heat Transfer',
+  '直喷': 'Direct-to-Garment',
+  '数码直喷': 'Digital DTG',
+  '丝网印刷': 'Screen Printing',
+  '刺绣': 'Embroidery',
+  '热升华': 'Sublimation',
+
+  // Colors
+  '黑色': 'Black', '白色': 'White', '红色': 'Red', '蓝色': 'Blue',
+  '绿色': 'Green', '黄色': 'Yellow', '灰色': 'Gray', '粉色': 'Pink',
+  '紫色': 'Purple', '橙色': 'Orange', '棕色': 'Brown', '米色': 'Beige',
+  '藏青色': 'Navy', '藏青': 'Navy', '深蓝色': 'Dark Blue', '深蓝': 'Dark Blue',
+  '浅蓝色': 'Light Blue', '浅蓝': 'Light Blue', '深灰色': 'Dark Gray', '深灰': 'Dark Gray',
+  '浅灰色': 'Light Gray', '浅灰': 'Light Gray', '酒红色': 'Burgundy', '酒红': 'Burgundy',
+  '军绿色': 'Army Green', '军绿': 'Army Green', '卡其色': 'Khaki', '卡其': 'Khaki',
+  '天蓝色': 'Sky Blue', '天蓝': 'Sky Blue', '宝蓝色': 'Royal Blue', '宝蓝': 'Royal Blue',
+  '墨绿色': 'Dark Green', '墨绿': 'Dark Green', '花灰': 'Heather Gray',
+  '杏色': 'Apricot', '驼色': 'Camel', '咖啡色': 'Coffee', '咖啡': 'Coffee',
+  '玫红': 'Hot Pink', '玫红色': 'Hot Pink', '荧光绿': 'Neon Green',
+  '荧光黄': 'Neon Yellow', '荧光粉': 'Neon Pink', '荧光橙': 'Neon Orange',
+  '深紫': 'Dark Purple', '浅紫': 'Light Purple', '浅粉': 'Light Pink',
+  '深红': 'Dark Red', '桃红': 'Peach', '湖蓝': 'Lake Blue',
+  '米白': 'Off-White', '本白': 'Natural White', '漂白': 'Bleached White',
+  '麻灰': 'Linen Gray', '铁灰': 'Iron Gray', '炭灰': 'Charcoal',
+  '烟灰': 'Smoke Gray', '银灰': 'Silver Gray',
+  '翠绿': 'Emerald', '草绿': 'Grass Green', '果绿': 'Apple Green',
+  '橄榄绿': 'Olive Green', '森林绿': 'Forest Green',
+  '砖红': 'Brick Red', '枣红': 'Maroon', '暗红': 'Dark Red',
+  '粉红': 'Pink', '桔色': 'Orange', '金色': 'Gold', '银色': 'Silver',
+
+  // Sizes
+  '均码': 'One Size', '加大': 'Plus Size', '大码': 'Large', '小码': 'Small',
+
+  // Statuses
+  '待推送': 'Pending Push', '待推审': 'Pending Review', '审核中': 'Under Review',
+  '店铺审核': 'Store Audit', '工厂审核': 'Factory Audit', '生产中': 'In Production',
+  '已发货': 'Shipped', '已关闭': 'Closed', '退款中': 'Refunding', '已退款': 'Refunded',
+  '已拒绝': 'Rejected', '拒绝': 'Rejected', '未发货': 'Not Shipped',
+  '待付款': 'Pending Payment', '已付款': 'Paid', '取消': 'Cancelled', '完成': 'Completed',
+
+  // General
+  '订单': 'Order', '商品': 'Item', '数量': 'Quantity', '颜色': 'Color',
+  '尺码': 'Size', '款式': 'Style', '备注': 'Notes', '电话': 'Phone',
+  '地址': 'Address', '快递': 'Courier', '物流': 'Logistics',
+  '运单号': 'Tracking Number', '收件人': 'Recipient', '收货人': 'Recipient',
+};
+
+function translateChinese(value) {
+  if (typeof value !== 'string') return value;
+  if (!/[\u4e00-\u9fff]/.test(value)) return value;
+
+  // Try exact match first
+  if (ZH_EN_MAP[value]) return ZH_EN_MAP[value];
+
+  // Try replacing known substrings (longer keys first)
+  let translated = value;
+  const sortedKeys = Object.keys(ZH_EN_MAP).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (translated.includes(key)) {
+      translated = translated.split(key).join(ZH_EN_MAP[key]);
+    }
+  }
+  return translated;
+}
+
+function translateData(obj) {
+  if (typeof obj === 'string') return translateChinese(obj);
+  if (Array.isArray(obj)) return obj.map(translateData);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      out[k] = translateData(v);
+    }
+    return out;
+  }
+  return obj;
+}
+
 async function api(method, path, body = null, isForm = false) {
   const opts = { method };
   if (isForm) {
@@ -15,7 +138,8 @@ async function api(method, path, body = null, isForm = false) {
     if (body) opts.body = JSON.stringify(body);
   }
   const res = await fetch(path, opts);
-  return res.json();
+  const data = await res.json();
+  return translateData(data);
 }
 
 function toast(msg, type = 'success') {
