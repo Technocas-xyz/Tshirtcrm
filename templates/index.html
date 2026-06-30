@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>T-Shirt CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: { brand: { 50:'#eff6ff',100:'#dbeafe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8' } }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .nav-item { display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;
+      color:#94a3b8;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;width:100%;border:none;background:none;text-align:left; }
+    .nav-item:hover { background:#1e293b;color:#e2e8f0; }
+    .nav-item.active { background:#2563eb;color:#fff; }
+    .nav-item svg { flex-shrink:0;opacity:.7; }
+    .nav-item.active svg { opacity:1; }
+    #order-panel { transition:transform .25s cubic-bezier(.4,0,.2,1);transform:translateX(100%); }
+    #order-panel.open { transform:translateX(0); }
+    #modal-wrap { display:none; }
+    #modal-wrap.open { display:flex; }
+    .status-badge { display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap; }
+    .upload-zone { border:2px dashed #cbd5e1;border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:#f8fafc; }
+    .upload-zone:hover,.upload-zone.drag-over { border-color:#3b82f6;background:#eff6ff; }
+    .upload-zone.uploaded { border-color:#10b981;background:#f0fdf4; }
+    .stat-card { background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #f1f5f9; }
+    .form-label { font-size:13px;font-weight:500;color:#475569;margin-bottom:5px;display:block; }
+    .form-input { width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:9px 13px;font-size:14px;color:#1e293b;outline:none;transition:border .15s;background:#fff; }
+    .form-input:focus { border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+    .form-select { appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center; }
+    .btn { display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap; }
+    .btn-primary { background:#2563eb;color:#fff; }
+    .btn-primary:hover { background:#1d4ed8; }
+    .btn-primary:disabled { background:#93c5fd;cursor:not-allowed; }
+    .btn-secondary { background:#f1f5f9;color:#475569;border:1px solid #e2e8f0; }
+    .btn-secondary:hover { background:#e2e8f0; }
+    .btn-danger { background:#fef2f2;color:#dc2626;border:1px solid #fecaca; }
+    .btn-danger:hover { background:#fee2e2; }
+    .btn-ghost { background:transparent;color:#64748b; }
+    .btn-ghost:hover { background:#f1f5f9; }
+    .table-row { transition:background .1s; }
+    .table-row:hover { background:#f8fafc;cursor:pointer; }
+    .item-card { background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:14px; }
+    .tab-btn { padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748b;transition:all .15s; }
+    .tab-btn.active { background:#fff;color:#2563eb;box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:600; }
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#cbd5e1;border-radius:3px; }
+    .toast { padding:12px 18px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.12);display:flex;align-items:center;gap:10px;animation:slideUp .25s ease; }
+    @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .spinner { animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg) } }
+  </style>
+</head>
+<body class="bg-slate-50 flex h-screen overflow-hidden text-slate-800">
+
+  <!-- ── Sidebar ── -->
+  <aside class="w-56 bg-slate-950 flex flex-col flex-shrink-0 h-full">
+    <div class="px-5 py-5 border-b border-slate-800">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-lg">👕</div>
+        <div>
+          <p class="text-white font-semibold text-sm leading-tight">T-Shirt CRM</p>
+          <p class="text-slate-500 text-xs">riin.com</p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+      <button class="nav-item active" data-view="dashboard" onclick="navigate('dashboard')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-view="orders" onclick="navigate('orders')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><path d="M9 12h6M9 16h4"/></svg>
+        Orders
+      </button>
+      <button class="nav-item" data-view="new-order" onclick="navigate('new-order')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        New Order
+      </button>
+      <button class="nav-item" data-view="catalog" onclick="navigate('catalog')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Catalog
+      </button>
+      <button class="nav-item" data-view="settings" onclick="navigate('settings')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </nav>
+
+    <div class="p-3 border-t border-slate-800">
+      <div id="env-badge" class="text-center py-1.5 px-3 rounded-lg bg-emerald-950 text-emerald-400 text-xs font-medium">
+        ● Production
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+    <!-- Top bar -->
+    <header class="bg-white border-b border-slate-100 px-6 py-3.5 flex items-center justify-between flex-shrink-0 shadow-sm">
+      <div>
+        <h1 id="page-title" class="text-base font-semibold text-slate-900">Dashboard</h1>
+        <p id="page-sub" class="text-xs text-slate-400 mt-0.5"></p>
+      </div>
+      <div id="page-actions" class="flex items-center gap-2"></div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 overflow-y-auto p-6">
+      <section id="view-dashboard" class="view active"></section>
+      <section id="view-orders" class="view"></section>
+      <section id="view-new-order" class="view"></section>
+      <section id="view-catalog" class="view"></section>
+      <section id="view-settings" class="view"></section>
+    </main>
+  </div>
+
+  <!-- ── Order Detail Panel ── -->
+  <div id="panel-backdrop" class="hidden fixed inset-0 bg-black/20 z-40" onclick="closePanel()"></div>
+  <aside id="order-panel" class="fixed top-0 right-0 h-full w-[460px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-100"></aside>
+
+  <!-- ── Modal ── -->
+  <div id="modal-wrap" class="fixed inset-0 bg-black/40 z-50 items-center justify-center p-4">
+    <div id="modal-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"></div>
+  </div>
+
+  <!-- ── Toasts ── -->
+  <div id="toasts" class="fixed bottom-5 right-5 z-[100] space-y-2 pointer-events-none"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
