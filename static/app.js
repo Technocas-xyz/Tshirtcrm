@@ -335,8 +335,7 @@ async function syncAll(btn) {
   btn.disabled = false;
   btn.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync All`;
   let msg = `Synced ${res.updated} order(s)`;
-  if (res.removed > 0) msg += ` · removed ${res.removed} local-only order(s) not found on supplier`;
-  toast(msg, res.removed > 0 ? 'warn' : 'success');
+  toast(msg, 'success');
   loadOrders();
 }
 

@@ -546,17 +546,14 @@ def sync_orders():
         oids = [r["platform_oid"] for r in rows]
 
     if not oids:
-        return jsonify({"success": True, "updated": 0, "removed": 0})
+        return jsonify({"success": True, "updated": 0})
 
     updated = 0
-    removed = 0
     for i in range(0, len(oids), 100):
         batch = oids[i:i + 100]
         result = supplier_post("/trade/api/interface/queryOrderStatus", {"platformOidList": batch})
         if not result.get("successful"):
             continue
-        responded = {item["platformOid"] for item in (result.get("data") or [])}
-        orphans = [oid for oid in batch if oid not in responded]
 
         conn = get_db()
         for item in (result.get("data") or []):
@@ -565,14 +562,10 @@ def sync_orders():
                 (item["orderStatus"], item.get("orderStateStr", ""), ts(), item["platformOid"]),
             )
             updated += 1
-        # Remove orders the supplier has no record of
-        for oid in orphans:
-            conn.execute("DELETE FROM orders WHERE platform_oid=?", (oid,))
-            removed += 1
         conn.commit()
         conn.close()
 
-    return jsonify({"success": True, "updated": updated, "removed": removed})
+    return jsonify({"success": True, "updated": updated})
 
 
 @app.route("/api/orders/import", methods=["POST"])
