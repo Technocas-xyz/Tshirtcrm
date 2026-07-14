@@ -666,10 +666,16 @@ async function initNewOrder() {
         <!-- Submit -->
         <div class="flex justify-end gap-3 pb-8">
           <button type="button" onclick="navigate('orders')" class="btn btn-secondary">Cancel</button>
+          <button type="button" onclick="previewPayload()" class="btn btn-secondary">Preview JSON</button>
           <button type="submit" id="submit-btn" class="btn btn-primary px-8">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             Place Order
           </button>
+        </div>
+        <div id="json-preview" class="hidden mb-8">
+          <div class="bg-slate-900 rounded-xl p-4 overflow-x-auto">
+            <pre id="json-preview-content" class="text-xs text-green-400 whitespace-pre-wrap font-mono"></pre>
+          </div>
         </div>
       </form>
     </div>`;
@@ -919,27 +925,8 @@ function clearImage(idx, type) {
   renderItems();
 }
 
-async function submitNewOrder(e) {
-  e.preventDefault();
-  // Validate items
-  if (!newOrderItems.length) { toast('Add at least one item', 'warn'); return; }
-  for (let i = 0; i < newOrderItems.length; i++) {
-    const item = newOrderItems[i];
-    if (!item.title)     { toast(`Item #${i+1}: title is required`, 'warn'); return; }
-    if (!item.styleCode) { toast(`Item #${i+1}: style is required`, 'warn'); return; }
-    if (!item.colorCode) { toast(`Item #${i+1}: color is required`, 'warn'); return; }
-    if (!item.sizeCode)  { toast(`Item #${i+1}: size is required`, 'warn'); return; }
-    if (!item.printUrl)  { toast(`Item #${i+1}: print image is required`, 'warn'); return; }
-    if (!item.mockupUrl) { toast(`Item #${i+1}: mockup image is required`, 'warn'); return; }
-    if (item.printPosition === '1,2' && !item.printBackUrl) { toast(`Item #${i+1}: back print image is required for Both position`, 'warn'); return; }
-    if (item.printPosition === '1,2' && !item.mockupBackUrl) { toast(`Item #${i+1}: back mockup image is required for Both position`, 'warn'); return; }
-  }
-
+function buildOrderPayload() {
   const oid = el('f-oid').value.trim();
-  const btn = el('submit-btn');
-  btn.disabled = true;
-  btn.innerHTML = `<svg class="spinner w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Placing Order…`;
-
   const goodsList = newOrderItems.map((item, i) => {
     const subOid = `${oid}${String(i+1).padStart(3,'0')}`;
     const images = [
@@ -952,7 +939,6 @@ async function submitNewOrder(e) {
     if (item.printPosition === '1,2' && item.mockupBackUrl) {
       images.push({ type: 2, imageUrl: item.mockupBackUrl, imageCode: item.mockupBackCode || `mockupback_${oid}_${i}`, imageName: item.mockupBackCode || `mockupback_${oid}_${i}` });
     }
-
     const entry = {
       platformOid: oid,
       platformOlId: subOid,
@@ -993,11 +979,40 @@ async function submitNewOrder(e) {
     orderTime: el('f-ordertime').value.trim(),
     goodsList: goodsList,
   };
-  // Only include optional fields if they have values
   const courier = el('f-courier').value.trim();
   if (courier) payload.deliveryCourier = courier;
+  return payload;
+}
 
-  console.log('Order payload:', JSON.stringify(payload, null, 2));
+function previewPayload() {
+  const payload = buildOrderPayload();
+  const box = el('json-preview');
+  const content = el('json-preview-content');
+  box.classList.toggle('hidden');
+  content.textContent = JSON.stringify(payload, null, 2);
+}
+
+async function submitNewOrder(e) {
+  e.preventDefault();
+  // Validate items
+  if (!newOrderItems.length) { toast('Add at least one item', 'warn'); return; }
+  for (let i = 0; i < newOrderItems.length; i++) {
+    const item = newOrderItems[i];
+    if (!item.title)     { toast(`Item #${i+1}: title is required`, 'warn'); return; }
+    if (!item.styleCode) { toast(`Item #${i+1}: style is required`, 'warn'); return; }
+    if (!item.colorCode) { toast(`Item #${i+1}: color is required`, 'warn'); return; }
+    if (!item.sizeCode)  { toast(`Item #${i+1}: size is required`, 'warn'); return; }
+    if (!item.printUrl)  { toast(`Item #${i+1}: print image is required`, 'warn'); return; }
+    if (!item.mockupUrl) { toast(`Item #${i+1}: mockup image is required`, 'warn'); return; }
+    if (item.printPosition === '1,2' && !item.printBackUrl) { toast(`Item #${i+1}: back print image is required for Both position`, 'warn'); return; }
+    if (item.printPosition === '1,2' && !item.mockupBackUrl) { toast(`Item #${i+1}: back mockup image is required for Both position`, 'warn'); return; }
+  }
+
+  const payload = buildOrderPayload();
+  const oid = payload.platformOid;
+  const btn = el('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="spinner w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Placing Order…`;
 
   const res = await api('POST', '/api/orders', payload);
   btn.disabled = false;
