@@ -940,31 +940,41 @@ async function submitNewOrder(e) {
   btn.disabled = true;
   btn.innerHTML = `<svg class="spinner w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Placing Order…`;
 
-  const goodsList = newOrderItems.map((item, i) => ({
-    platformOid: oid,
-    platformOlId: `${oid}${String(i+1).padStart(3,'0')}`,
-    goodsType: 1,
-    title: item.title,
-    goodsStatus: 'NOT_SHIPPED',
-    refundStatus: 'NO_REFUND',
-    sizeCode: item.sizeCode,
-    sizeName: item.sizeName || item.sizeCode,
-    colorCode: item.colorCode,
-    colorName: item.colorName || item.colorCode,
-    styleCode: item.styleCode,
-    styleName: item.styleName || item.styleCode,
-    craftType: parseInt(item.craftType),
-    num: parseInt(item.num) || 1,
-    ...(item.printPosition ? { printPosition: item.printPosition } : {}),
-    ...(item.specification ? { specification: item.specification } : {}),
-    ...(item.remark ? { remark: item.remark } : {}),
-    imageList: [
+  const goodsList = newOrderItems.map((item, i) => {
+    const subOid = `${oid}${String(i+1).padStart(3,'0')}`;
+    const images = [
       { type: 1, imageUrl: item.printUrl, imageCode: item.printCode || `print_${oid}_${i}`, imageName: item.printCode || `print_${oid}_${i}` },
       { type: 2, imageUrl: item.mockupUrl, imageCode: item.mockupCode || `mockup_${oid}_${i}`, imageName: item.mockupCode || `mockup_${oid}_${i}` },
-      ...(item.printPosition === '1,2' && item.printBackUrl ? [{ type: 1, imageUrl: item.printBackUrl, imageCode: item.printBackCode || `printback_${oid}_${i}`, imageName: item.printBackCode || `printback_${oid}_${i}` }] : []),
-      ...(item.printPosition === '1,2' && item.mockupBackUrl ? [{ type: 2, imageUrl: item.mockupBackUrl, imageCode: item.mockupBackCode || `mockupback_${oid}_${i}`, imageName: item.mockupBackCode || `mockupback_${oid}_${i}` }] : []),
-    ],
-  }));
+    ];
+    if (item.printPosition === '1,2' && item.printBackUrl) {
+      images.push({ type: 1, imageUrl: item.printBackUrl, imageCode: item.printBackCode || `printback_${oid}_${i}`, imageName: item.printBackCode || `printback_${oid}_${i}` });
+    }
+    if (item.printPosition === '1,2' && item.mockupBackUrl) {
+      images.push({ type: 2, imageUrl: item.mockupBackUrl, imageCode: item.mockupBackCode || `mockupback_${oid}_${i}`, imageName: item.mockupBackCode || `mockupback_${oid}_${i}` });
+    }
+
+    const entry = {
+      platformOid: oid,
+      platformOlId: subOid,
+      goodsType: 1,
+      title: item.title,
+      goodsStatus: 'NOT_SHIPPED',
+      refundStatus: 'NO_REFUND',
+      sizeCode: item.sizeCode,
+      sizeName: item.sizeName || item.sizeCode,
+      colorCode: item.colorCode,
+      colorName: item.colorName || item.colorCode,
+      styleCode: item.styleCode,
+      styleName: item.styleName || item.styleCode,
+      craftType: parseInt(item.craftType),
+      num: parseInt(item.num) || 1,
+      imageList: images,
+    };
+    if (item.printPosition) entry.printPosition = item.printPosition;
+    if (item.specification) entry.specification = item.specification;
+    if (item.remark) entry.remark = item.remark;
+    return entry;
+  });
 
   const payload = {
     platformType: 15,
@@ -981,9 +991,13 @@ async function submitNewOrder(e) {
     receiverCity: el('f-city').value.trim(),
     postCode: el('f-zip').value.trim(),
     orderTime: el('f-ordertime').value.trim(),
-    deliveryCourier: el('f-courier').value.trim(),
-    goodsList,
+    goodsList: goodsList,
   };
+  // Only include optional fields if they have values
+  const courier = el('f-courier').value.trim();
+  if (courier) payload.deliveryCourier = courier;
+
+  console.log('Order payload:', JSON.stringify(payload, null, 2));
 
   const res = await api('POST', '/api/orders', payload);
   btn.disabled = false;

@@ -443,6 +443,8 @@ def list_orders():
 @login_required
 def create_order():
     data = request.json or {}
+    # Log the payload for debugging
+    app.logger.info("placeOrder payload: %s", json.dumps(data, ensure_ascii=False)[:2000])
     result = supplier_post("/trade/api/interface/placeOrder", data)
     if not result.get("successful"):
         return jsonify({"success": False, "message": result.get("message", "Unknown error")}), 400
