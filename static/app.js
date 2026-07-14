@@ -701,9 +701,10 @@ function addOrderItem() {
   newOrderItems.push({
     title:'', styleCode:'', styleName:'', colorCode:'', colorName:'',
     sizeCode:'', sizeName:'', craftType:1, num:1,
-    printUrl:'', mockupUrl:'',
+    printUrl:'', mockupUrl:'', printBackUrl:'',
     printCode:`print_${oid}_${idx+1}`,
     mockupCode:`mockup_${oid}_${idx+1}`,
+    printBackCode:`printback_${oid}_${idx+1}`,
     printPosition:'', specification:'', remark:'',
   });
   renderItems();
@@ -743,6 +744,8 @@ function sizeOptions(selected) {
 function renderItemCard(item, i) {
   const printThumb  = item.printUrl  ? `<img src="${item.printUrl}"  class="mt-2 h-14 rounded-lg object-cover border border-slate-200" />` : '';
   const mockupThumb = item.mockupUrl ? `<img src="${item.mockupUrl}" class="mt-2 h-14 rounded-lg object-cover border border-slate-200" />` : '';
+  const printBackThumb = item.printBackUrl ? `<img src="${item.printBackUrl}" class="mt-2 h-14 rounded-lg object-cover border border-slate-200" />` : '';
+  const showBack = item.printPosition === '1,2';
   return `
     <div class="item-card" id="item-card-${i}">
       <div class="flex items-center justify-between mb-3">
@@ -787,7 +790,7 @@ function renderItemCard(item, i) {
         <div class="grid grid-cols-3 gap-3">
           <div>
             <label class="form-label">Print Position</label>
-            <select class="form-input form-select text-sm" data-idx="${i}" data-field="printPosition">
+            <select class="form-input form-select text-sm" data-idx="${i}" data-field="printPosition" onchange="onPrintPositionChange(${i}, this.value)">
               <option value="" ${!item.printPosition?'selected':''}>— None —</option>
               <option value="1" ${item.printPosition==='1'?'selected':''}>Front</option>
               <option value="2" ${item.printPosition==='2'?'selected':''}>Back</option>
@@ -805,16 +808,26 @@ function renderItemCard(item, i) {
         </div>
 
         <!-- Images -->
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid ${showBack ? 'grid-cols-3' : 'grid-cols-2'} gap-4">
           <div>
-            <label class="form-label">Print Image * <span class="text-slate-400 font-normal text-xs">(PNG, what gets printed)</span></label>
+            <label class="form-label">${showBack ? 'Front Print *' : 'Print Image *'} <span class="text-slate-400 font-normal text-xs">(PNG, what gets printed)</span></label>
             <div id="upload-print-${i}" class="upload-zone${item.printUrl?' uploaded':''}" onclick="triggerUpload(${i},'print')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,${i},'print')">
               ${item.printUrl
                 ? `<div class="flex flex-col items-center gap-1"><span class="text-emerald-600 text-lg">✓</span><span class="text-xs font-medium text-emerald-700">Uploaded</span>${printThumb}<button type="button" onclick="event.stopPropagation();clearImage(${i},'print')" class="text-xs text-red-500 mt-1">Remove</button></div>`
-                : `<div class="flex flex-col items-center gap-1.5 text-slate-400"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span class="text-xs font-medium">Upload Print Image</span><span class="text-xs">Click or drag &amp; drop PNG</span></div>`}
+                : `<div class="flex flex-col items-center gap-1.5 text-slate-400"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span class="text-xs font-medium">${showBack ? 'Front Print' : 'Upload Print Image'}</span><span class="text-xs">Click or drag &amp; drop PNG</span></div>`}
             </div>
             <input type="file" id="file-print-${i}" accept="image/png,image/jpeg,image/jpg" class="hidden" onchange="handleFileSelect(event,${i},'print')">
           </div>
+          ${showBack ? `
+          <div>
+            <label class="form-label">Back Print * <span class="text-slate-400 font-normal text-xs">(PNG, back design)</span></label>
+            <div id="upload-printBack-${i}" class="upload-zone${item.printBackUrl?' uploaded':''}" onclick="triggerUpload(${i},'printBack')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,${i},'printBack')">
+              ${item.printBackUrl
+                ? `<div class="flex flex-col items-center gap-1"><span class="text-emerald-600 text-lg">✓</span><span class="text-xs font-medium text-emerald-700">Uploaded</span>${printBackThumb}<button type="button" onclick="event.stopPropagation();clearImage(${i},'printBack')" class="text-xs text-red-500 mt-1">Remove</button></div>`
+                : `<div class="flex flex-col items-center gap-1.5 text-slate-400"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span class="text-xs font-medium">Back Print</span><span class="text-xs">Click or drag &amp; drop PNG</span></div>`}
+            </div>
+            <input type="file" id="file-printBack-${i}" accept="image/png,image/jpeg,image/jpg" class="hidden" onchange="handleFileSelect(event,${i},'printBack')">
+          </div>` : ''}
           <div>
             <label class="form-label">Mockup Image * <span class="text-slate-400 font-normal text-xs">(preview/effect)</span></label>
             <div id="upload-mockup-${i}" class="upload-zone${item.mockupUrl?' uploaded':''}" onclick="triggerUpload(${i},'mockup')" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,${i},'mockup')">
@@ -827,6 +840,11 @@ function renderItemCard(item, i) {
         </div>
       </div>
     </div>`;
+}
+
+function onPrintPositionChange(idx, value) {
+  newOrderItems[idx].printPosition = value;
+  renderItems();
 }
 
 // Image upload handlers
@@ -861,8 +879,9 @@ async function uploadImage(file, idx, type) {
   }
 
   if (result.url) {
-    if (type === 'print')   { newOrderItems[idx].printUrl  = result.url; newOrderItems[idx].printCode  = result.public_id || `print_${idx}`; }
-    if (type === 'mockup')  { newOrderItems[idx].mockupUrl = result.url; newOrderItems[idx].mockupCode = result.public_id || `mockup_${idx}`; }
+    if (type === 'print')     { newOrderItems[idx].printUrl  = result.url; newOrderItems[idx].printCode  = result.public_id || `print_${idx}`; }
+    if (type === 'printBack') { newOrderItems[idx].printBackUrl = result.url; newOrderItems[idx].printBackCode = result.public_id || `printback_${idx}`; }
+    if (type === 'mockup')    { newOrderItems[idx].mockupUrl = result.url; newOrderItems[idx].mockupCode = result.public_id || `mockup_${idx}`; }
     toast('Image uploaded ✓', 'success');
     renderItems();
   } else {
@@ -872,8 +891,9 @@ async function uploadImage(file, idx, type) {
 }
 
 function clearImage(idx, type) {
-  if (type === 'print')  { newOrderItems[idx].printUrl = '';  newOrderItems[idx].printCode = ''; }
-  if (type === 'mockup') { newOrderItems[idx].mockupUrl = ''; newOrderItems[idx].mockupCode = ''; }
+  if (type === 'print')     { newOrderItems[idx].printUrl = '';  newOrderItems[idx].printCode = ''; }
+  if (type === 'printBack') { newOrderItems[idx].printBackUrl = ''; newOrderItems[idx].printBackCode = ''; }
+  if (type === 'mockup')    { newOrderItems[idx].mockupUrl = ''; newOrderItems[idx].mockupCode = ''; }
   renderItems();
 }
 
@@ -889,6 +909,7 @@ async function submitNewOrder(e) {
     if (!item.sizeCode)  { toast(`Item #${i+1}: size is required`, 'warn'); return; }
     if (!item.printUrl)  { toast(`Item #${i+1}: print image is required`, 'warn'); return; }
     if (!item.mockupUrl) { toast(`Item #${i+1}: mockup image is required`, 'warn'); return; }
+    if (item.printPosition === '1,2' && !item.printBackUrl) { toast(`Item #${i+1}: back print image is required for Both position`, 'warn'); return; }
   }
 
   const oid = el('f-oid').value.trim();
@@ -915,7 +936,8 @@ async function submitNewOrder(e) {
     ...(item.specification ? { specification: item.specification } : {}),
     ...(item.remark ? { remark: item.remark } : {}),
     imageList: [
-      { type: 1, imageUrl: item.printUrl,  imageCode: item.printCode  || `print_${oid}_${i}`,  imageName: item.printCode  || `print_${oid}_${i}` },
+      { type: 1, imageUrl: item.printUrl, imageCode: item.printCode || `print_${oid}_${i}`, imageName: item.printCode || `print_${oid}_${i}` },
+      ...(item.printPosition === '1,2' && item.printBackUrl ? [{ type: 3, imageUrl: item.printBackUrl, imageCode: item.printBackCode || `printback_${oid}_${i}`, imageName: item.printBackCode || `printback_${oid}_${i}` }] : []),
       { type: 2, imageUrl: item.mockupUrl, imageCode: item.mockupCode || `mockup_${oid}_${i}`, imageName: item.mockupCode || `mockup_${oid}_${i}` },
     ],
   }));
