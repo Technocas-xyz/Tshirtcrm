@@ -68,6 +68,14 @@ def supplier_post(endpoint: str, body: dict) -> dict:
         resp = http.post(cfg["base_url"] + endpoint, data=body_str.encode(), headers=headers, timeout=90)
         resp.raise_for_status()
         return resp.json()
+    except http.exceptions.HTTPError as e:
+        # Try to get the response body for detailed error info
+        try:
+            err_data = e.response.json()
+            msg = err_data.get("message", "") or str(e)
+            return {"successful": False, "message": msg, "errorCode": err_data.get("errorCode", "")}
+        except Exception:
+            return {"successful": False, "message": str(e)}
     except http.exceptions.Timeout:
         return {"successful": False, "message": "Request timed out — server is processing, check status shortly."}
     except http.exceptions.RequestException as e:
