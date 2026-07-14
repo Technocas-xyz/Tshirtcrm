@@ -704,6 +704,7 @@ function addOrderItem() {
     printUrl:'', mockupUrl:'',
     printCode:`print_${oid}_${idx+1}`,
     mockupCode:`mockup_${oid}_${idx+1}`,
+    printPosition:'', specification:'', remark:'',
   });
   renderItems();
 }
@@ -782,6 +783,27 @@ function renderItemCard(item, i) {
             <input type="number" min="1" class="form-input text-sm" data-idx="${i}" data-field="num" value="${item.num}">
           </div>
         </div>
+        <!-- Optional Fields -->
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="form-label">Print Position</label>
+            <select class="form-input form-select text-sm" data-idx="${i}" data-field="printPosition">
+              <option value="" ${!item.printPosition?'selected':''}>— None —</option>
+              <option value="1" ${item.printPosition==='1'?'selected':''}>Front</option>
+              <option value="2" ${item.printPosition==='2'?'selected':''}>Back</option>
+              <option value="1,2" ${item.printPosition==='1,2'?'selected':''}>Both (Front & Back)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Specification</label>
+            <input class="form-input text-sm" data-idx="${i}" data-field="specification" value="${item.specification||''}" placeholder="e.g. Black/XL">
+          </div>
+          <div>
+            <label class="form-label">Remark</label>
+            <input class="form-input text-sm" data-idx="${i}" data-field="remark" value="${item.remark||''}" placeholder="Optional note">
+          </div>
+        </div>
+
         <!-- Images -->
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -876,7 +898,7 @@ async function submitNewOrder(e) {
 
   const goodsList = newOrderItems.map((item, i) => ({
     platformOid: oid,
-    platformOllId: `${oid}${String(i+1).padStart(3,'0')}`,
+    platformOlId: `${oid}${String(i+1).padStart(3,'0')}`,
     goodsType: 1,
     title: item.title,
     goodsStatus: 'NOT_SHIPPED',
@@ -889,6 +911,9 @@ async function submitNewOrder(e) {
     styleName: item.styleName || item.styleCode,
     craftType: parseInt(item.craftType),
     num: parseInt(item.num) || 1,
+    ...(item.printPosition ? { printPosition: item.printPosition } : {}),
+    ...(item.specification ? { specification: item.specification } : {}),
+    ...(item.remark ? { remark: item.remark } : {}),
     imageList: [
       { type: 1, imageUrl: item.printUrl,  imageCode: item.printCode  || `print_${oid}_${i}`,  imageName: item.printCode  || `print_${oid}_${i}` },
       { type: 2, imageUrl: item.mockupUrl, imageCode: item.mockupCode || `mockup_${oid}_${i}`, imageName: item.mockupCode || `mockup_${oid}_${i}` },
