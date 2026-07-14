@@ -203,6 +203,7 @@ const PAGE_META = {
   'new-order':{ title:'New Order',  sub:'Place a new T-shirt order' },
   catalog:    { title:'Catalog',    sub:'Browse available styles, colors & sizes' },
   settings:   { title:'Settings',   sub:'Configure API credentials' },
+  users:      { title:'Users',      sub:'Manage user accounts (Admin only)' },
 };
 
 function navigate(view) {
@@ -214,7 +215,7 @@ function navigate(view) {
   el('page-title').textContent = meta.title || view;
   el('page-sub').textContent   = meta.sub || '';
   closePanel();
-  ({ dashboard: loadDashboard, orders: loadOrders, 'new-order': initNewOrder, catalog: loadCatalog, settings: loadSettings })[view]?.();
+  ({ dashboard: loadDashboard, orders: loadOrders, 'new-order': initNewOrder, catalog: loadCatalog, settings: loadSettings, users: loadUsers })[view]?.();
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -1127,8 +1128,163 @@ function updateEnvBadge(env) {
   }
 }
 
+// ─── Logout ───────────────────────────────────────────────────────────────────
+async function logout() {
+  await api('POST', '/api/auth/logout');
+  window.location.href = '/login';
+}
+
+// ─── Users Management (Admin) ─────────────────────────────────────────────────
+async function loadUsers() {
+  el('page-actions').innerHTML = `<button class="btn btn-primary" onclick="openCreateUserModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add User</button>`;
+  el('view-users').innerHTML = `<div class="text-slate-400 text-sm py-8 text-center">Loading…</div>`;
+  const users = await api('GET', '/api/users');
+  if (users.error) { el('view-users').innerHTML = `<div class="text-red-500 text-sm py-8 text-center">${users.error}</div>`; return; }
+  el('view-users').innerHTML = `
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-100">
+            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Username</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Full Name</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Role</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Created</th>
+            <th class="px-5 py-3"></th>
+          </tr></thead>
+          <tbody>
+            ${users.map(u => `
+              <tr class="border-b border-slate-50 hover:bg-slate-50">
+                <td class="px-5 py-3.5 font-mono text-xs font-medium text-slate-700">${u.username}</td>
+                <td class="px-5 py-3.5 text-slate-800">${u.full_name || '—'}</td>
+                <td class="px-5 py-3.5">${u.is_admin ? '<span class="status-badge bg-violet-100 text-violet-700">Admin</span>' : '<span class="status-badge bg-slate-100 text-slate-600">User</span>'}</td>
+                <td class="px-5 py-3.5">${u.is_active ? '<span class="status-badge bg-emerald-100 text-emerald-700">Active</span>' : '<span class="status-badge bg-red-100 text-red-700">Disabled</span>'}</td>
+                <td class="px-5 py-3.5 text-slate-400 text-xs">${fmtDate(u.created_at)}</td>
+                <td class="px-5 py-3.5 flex gap-1">
+                  <button onclick='openEditUserModal(${JSON.stringify(u).replace(/'/g,"&#39;")})' class="btn btn-ghost text-xs p-1.5" title="Edit">✏️</button>
+                  <button onclick="deleteUser(${u.id},'${u.username}')" class="btn btn-ghost text-xs p-1.5 text-red-500" title="Delete">🗑️</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Change Password Section -->
+    <div class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 max-w-md">
+      <h3 class="font-semibold text-slate-800 mb-4">Change My Password</h3>
+      <div class="space-y-3">
+        <div><label class="form-label">Current Password</label><input id="cp-current" type="password" class="form-input"></div>
+        <div><label class="form-label">New Password</label><input id="cp-new" type="password" class="form-input"></div>
+        <button onclick="changeMyPassword()" class="btn btn-secondary">Update Password</button>
+      </div>
+    </div>`;
+}
+
+function openCreateUserModal() {
+  el('modal-box').innerHTML = `
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <h3 class="font-semibold text-slate-900">Create New User</h3>
+      <button onclick="closeModal()" class="btn btn-ghost p-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div><label class="form-label">Username *</label><input id="nu-user" class="form-input" placeholder="e.g. john" autofocus></div>
+      <div><label class="form-label">Full Name</label><input id="nu-name" class="form-input" placeholder="e.g. John Smith"></div>
+      <div><label class="form-label">Password *</label><input id="nu-pass" type="password" class="form-input" placeholder="Min 4 characters"></div>
+      <div class="flex items-center gap-2">
+        <input id="nu-admin" type="checkbox" class="w-4 h-4 rounded border-slate-300">
+        <label for="nu-admin" class="text-sm text-slate-700">Admin privileges</label>
+      </div>
+    </div>
+    <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+      <button onclick="closeModal()" class="btn btn-secondary">Cancel</button>
+      <button onclick="submitCreateUser()" class="btn btn-primary">Create User</button>
+    </div>`;
+  el('modal-wrap').classList.add('open');
+  setTimeout(() => el('nu-user').focus(), 50);
+}
+
+async function submitCreateUser() {
+  const username = el('nu-user').value.trim();
+  const password = el('nu-pass').value;
+  const full_name = el('nu-name').value.trim();
+  const is_admin = el('nu-admin').checked;
+  if (!username || !password) { toast('Username and password required', 'warn'); return; }
+  const res = await api('POST', '/api/users', { username, password, full_name, is_admin });
+  if (res.success) { toast('User created'); closeModal(); loadUsers(); }
+  else toast(res.message || 'Failed', 'error');
+}
+
+function openEditUserModal(user) {
+  el('modal-box').innerHTML = `
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <h3 class="font-semibold text-slate-900">Edit User — ${user.username}</h3>
+      <button onclick="closeModal()" class="btn btn-ghost p-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div><label class="form-label">Full Name</label><input id="eu-name" class="form-input" value="${user.full_name||''}"></div>
+      <div><label class="form-label">New Password <span class="text-slate-400 font-normal">(leave blank to keep current)</span></label><input id="eu-pass" type="password" class="form-input" placeholder="Leave blank to keep current"></div>
+      <div class="flex items-center gap-2">
+        <input id="eu-admin" type="checkbox" class="w-4 h-4 rounded border-slate-300" ${user.is_admin?'checked':''}>
+        <label for="eu-admin" class="text-sm text-slate-700">Admin privileges</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="eu-active" type="checkbox" class="w-4 h-4 rounded border-slate-300" ${user.is_active?'checked':''}>
+        <label for="eu-active" class="text-sm text-slate-700">Account active</label>
+      </div>
+    </div>
+    <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+      <button onclick="closeModal()" class="btn btn-secondary">Cancel</button>
+      <button onclick="submitEditUser(${user.id})" class="btn btn-primary">Save Changes</button>
+    </div>`;
+  el('modal-wrap').classList.add('open');
+}
+
+async function submitEditUser(uid) {
+  const data = {
+    full_name: el('eu-name').value.trim(),
+    is_admin: el('eu-admin').checked,
+    is_active: el('eu-active').checked,
+  };
+  const pw = el('eu-pass').value;
+  if (pw) data.password = pw;
+  const res = await api('PUT', `/api/users/${uid}`, data);
+  if (res.success) { toast('User updated'); closeModal(); loadUsers(); }
+  else toast(res.message || 'Failed', 'error');
+}
+
+async function deleteUser(uid, username) {
+  if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+  const res = await api('DELETE', `/api/users/${uid}`);
+  if (res.success) { toast('User deleted'); loadUsers(); }
+  else toast(res.message || 'Failed', 'error');
+}
+
+async function changeMyPassword() {
+  const current = el('cp-current').value;
+  const newPw = el('cp-new').value;
+  if (!current || !newPw) { toast('Fill both fields', 'warn'); return; }
+  const res = await api('POST', '/api/auth/change-password', { current_password: current, new_password: newPw });
+  if (res.success) { toast('Password updated'); el('cp-current').value = ''; el('cp-new').value = ''; }
+  else toast(res.message || 'Failed', 'error');
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 (async () => {
+  // Check auth
+  const me = await api('GET', '/api/auth/me');
+  if (me.error) { window.location.href = '/login'; return; }
+
+  // Show user info
+  const nameEl = el('current-user-name');
+  if (nameEl) nameEl.textContent = me.full_name || me.username;
+
+  // Show Users nav for admins
+  if (me.is_admin) {
+    const navUsers = el('nav-users');
+    if (navUsers) navUsers.style.display = '';
+  }
+
   const cfg = await api('GET', '/api/settings');
   updateEnvBadge(cfg.env || 'prod');
   navigate('dashboard');

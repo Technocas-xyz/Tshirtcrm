@@ -7,11 +7,14 @@ import os
 import sqlite3
 import time
 from datetime import datetime
+from functools import wraps
 
 import requests as http
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET", "tshirtcrm-secret-change-me-in-production")
 
 CONFIG_FILE = os.path.expanduser("~/.tshirt_api_config.json")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "crm.db")
@@ -142,6 +145,26 @@ def init_db():
             updated_at          TEXT
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            username    TEXT UNIQUE NOT NULL,
+            password    TEXT NOT NULL,
+            full_name   TEXT DEFAULT '',
+            is_admin    INTEGER DEFAULT 0,
+            is_active   INTEGER DEFAULT 1,
+            created_at  TEXT,
+            updated_at  TEXT
+        )
+    """)
+    # Create default admin if no users exist
+    row = conn.execute("SELECT COUNT(*) FROM users").fetchone()
+    if row[0] == 0:
+        now = ts()
+        conn.execute(
+            "INSERT INTO users (username, password, full_name, is_admin, is_active, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            ("admin", generate_password_hash("admin123"), "Super Admin", 1, 1, now, now)
+        )
     conn.commit()
     conn.close()
 
@@ -150,9 +173,189 @@ def ts() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# ─── Auth ──────────────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for("login_page"))
+        if not session.get("is_admin"):
+            return jsonify({"error": "Admin access required"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/login", methods=["GET"])
+def login_page():
+    if "user_id" in session:
+        return redirect(url_for("index"))
+    return render_template("login.html")
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def api_login():
+    data = request.json or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    if not username or not password:
+        return jsonify({"success": False, "message": "Username and password required"}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    conn.close()
+
+    if not user or not check_password_hash(user["password"], password):
+        return jsonify({"success": False, "message": "Invalid credentials"}), 401
+    if not user["is_active"]:
+        return jsonify({"success": False, "message": "Account is disabled"}), 403
+
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+    session["full_name"] = user["full_name"]
+    session["is_admin"] = bool(user["is_admin"])
+    return jsonify({"success": True, "user": {"username": user["username"], "full_name": user["full_name"], "is_admin": bool(user["is_admin"])}})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"success": True})
+
+
+@app.route("/api/auth/me", methods=["GET"])
+@login_required
+def api_me():
+    return jsonify({
+        "username": session.get("username"),
+        "full_name": session.get("full_name"),
+        "is_admin": session.get("is_admin", False),
+    })
+
+
+@app.route("/api/auth/change-password", methods=["POST"])
+@login_required
+def api_change_password():
+    data = request.json or {}
+    current = data.get("current_password", "")
+    new_pw = data.get("new_password", "")
+    if not current or not new_pw:
+        return jsonify({"success": False, "message": "Both current and new password required"}), 400
+    if len(new_pw) < 4:
+        return jsonify({"success": False, "message": "New password must be at least 4 characters"}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE id=?", (session["user_id"],)).fetchone()
+    if not user or not check_password_hash(user["password"], current):
+        conn.close()
+        return jsonify({"success": False, "message": "Current password is incorrect"}), 401
+
+    conn.execute("UPDATE users SET password=?, updated_at=? WHERE id=?",
+                 (generate_password_hash(new_pw), ts(), session["user_id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+# ─── Routes: User Management (Admin only) ─────────────────────────────────────
+
+@app.route("/api/users", methods=["GET"])
+@admin_required
+def list_users():
+    conn = get_db()
+    rows = conn.execute("SELECT id, username, full_name, is_admin, is_active, created_at, updated_at FROM users ORDER BY id").fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/users", methods=["POST"])
+@admin_required
+def create_user():
+    data = request.json or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    full_name = (data.get("full_name") or "").strip()
+    is_admin = 1 if data.get("is_admin") else 0
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "Username and password required"}), 400
+    if len(password) < 4:
+        return jsonify({"success": False, "message": "Password must be at least 4 characters"}), 400
+
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"success": False, "message": "Username already exists"}), 409
+
+    now = ts()
+    conn.execute(
+        "INSERT INTO users (username, password, full_name, is_admin, is_active, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+        (username, generate_password_hash(password), full_name, is_admin, 1, now, now)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/users/<int:uid>", methods=["PUT"])
+@admin_required
+def update_user(uid):
+    data = request.json or {}
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    full_name = (data.get("full_name") or user["full_name"]).strip()
+    is_admin = 1 if data.get("is_admin") else 0
+    is_active = 1 if data.get("is_active", user["is_active"]) else 0
+    password = data.get("password", "")
+
+    if password:
+        if len(password) < 4:
+            conn.close()
+            return jsonify({"success": False, "message": "Password must be at least 4 characters"}), 400
+        conn.execute("UPDATE users SET full_name=?, is_admin=?, is_active=?, password=?, updated_at=? WHERE id=?",
+                     (full_name, is_admin, is_active, generate_password_hash(password), ts(), uid))
+    else:
+        conn.execute("UPDATE users SET full_name=?, is_admin=?, is_active=?, updated_at=? WHERE id=?",
+                     (full_name, is_admin, is_active, ts(), uid))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/users/<int:uid>", methods=["DELETE"])
+@admin_required
+def delete_user(uid):
+    if uid == session.get("user_id"):
+        return jsonify({"success": False, "message": "Cannot delete yourself"}), 400
+    conn = get_db()
+    conn.execute("DELETE FROM users WHERE id=?", (uid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
 # ─── Routes: Static ───────────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
@@ -160,6 +363,7 @@ def index():
 # ─── Routes: Settings ─────────────────────────────────────────────────────────
 
 @app.route("/api/settings", methods=["GET"])
+@login_required
 def get_settings():
     cfg = get_config()
     return jsonify({
@@ -173,6 +377,7 @@ def get_settings():
 
 
 @app.route("/api/settings", methods=["POST"])
+@login_required
 def post_settings():
     data = request.json or {}
     cfg = get_config()
@@ -191,6 +396,7 @@ def post_settings():
 # ─── Routes: Upload ───────────────────────────────────────────────────────────
 
 @app.route("/api/upload", methods=["POST"])
+@login_required
 def upload_image():
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
@@ -206,6 +412,7 @@ def upload_image():
 # ─── Routes: Orders ───────────────────────────────────────────────────────────
 
 @app.route("/api/orders", methods=["GET"])
+@login_required
 def list_orders():
     q = request.args.get("q", "")
     status = request.args.get("status", "")
@@ -225,6 +432,7 @@ def list_orders():
 
 
 @app.route("/api/orders", methods=["POST"])
+@login_required
 def create_order():
     data = request.json or {}
     result = supplier_post("/trade/api/interface/placeOrder", data)
@@ -257,6 +465,7 @@ def create_order():
 
 
 @app.route("/api/orders/<oid>", methods=["GET"])
+@login_required
 def get_order(oid):
     conn = get_db()
     row = conn.execute("SELECT * FROM orders WHERE platform_oid=?", (oid,)).fetchone()
@@ -267,6 +476,7 @@ def get_order(oid):
 
 
 @app.route("/api/orders/<oid>", methods=["PUT"])
+@login_required
 def update_order(oid):
     data = request.json or {}
     result = supplier_post("/trade/api/interface/updateOrder", data)
@@ -290,6 +500,7 @@ def update_order(oid):
 
 
 @app.route("/api/orders/<oid>/close", methods=["POST"])
+@login_required
 def close_order(oid):
     result = supplier_post("/trade/api/interface/closeOrder", {"platformOid": oid})
     if not result.get("successful"):
@@ -305,6 +516,7 @@ def close_order(oid):
 
 
 @app.route("/api/orders/<oid>/notes", methods=["PUT"])
+@login_required
 def update_notes(oid):
     data = request.json or {}
     conn = get_db()
@@ -316,11 +528,13 @@ def update_notes(oid):
 
 
 @app.route("/api/orders/<oid>/delivery", methods=["GET"])
+@login_required
 def get_delivery(oid):
     return jsonify(supplier_post("/trade/api/interface/queryOrderDelivery", {"platformOidList": [oid]}))
 
 
 @app.route("/api/orders/sync", methods=["POST"])
+@login_required
 def sync_orders():
     data = request.json or {}
     oids = data.get("oids", [])
@@ -362,6 +576,7 @@ def sync_orders():
 
 
 @app.route("/api/orders/import", methods=["POST"])
+@login_required
 def import_order():
     """Import an existing supplier order into local DB by its platformOid."""
     data = request.json or {}
@@ -408,16 +623,19 @@ def import_order():
 # ─── Routes: Catalog ──────────────────────────────────────────────────────────
 
 @app.route("/api/catalog/styles")
+@login_required
 def get_styles():
     return jsonify(cached_catalog("styles", "/trade/api/interface/queryStyle"))
 
 
 @app.route("/api/catalog/colors")
+@login_required
 def get_colors():
     return jsonify(cached_catalog("colors", "/trade/api/interface/queryColor"))
 
 
 @app.route("/api/catalog/sizes")
+@login_required
 def get_sizes():
     return jsonify(cached_catalog("sizes", "/trade/api/interface/querySize"))
 

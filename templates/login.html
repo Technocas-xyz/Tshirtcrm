@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — T-Shirt CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl mx-auto mb-4">👕</div>
+      <h1 class="text-xl font-bold text-slate-900">T-Shirt CRM</h1>
+      <p class="text-sm text-slate-500 mt-1">Sign in to your account</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1.5">Username</label>
+          <input id="login-user" type="text" required autofocus
+            class="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
+            placeholder="Enter username">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1.5">Password</label>
+          <input id="login-pass" type="password" required
+            class="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
+            placeholder="Enter password">
+        </div>
+        <div id="login-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3"></div>
+        <button type="submit" id="login-btn"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm transition">
+          Sign In
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-xs text-slate-400 mt-6">Managed by administrator</p>
+  </div>
+
+  <script>
+    async function handleLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const errBox = document.getElementById('login-error');
+      errBox.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('login-user').value.trim(),
+            password: document.getElementById('login-pass').value,
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          window.location.href = '/';
+        } else {
+          errBox.textContent = data.message || 'Login failed';
+          errBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        errBox.textContent = 'Network error — try again';
+        errBox.classList.remove('hidden');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
+  </script>
+</body>
+</html>
