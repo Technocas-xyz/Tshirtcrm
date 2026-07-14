@@ -66,16 +66,12 @@ def supplier_post(endpoint: str, body: dict) -> dict:
     }
     try:
         resp = http.post(cfg["base_url"] + endpoint, data=body_str.encode(), headers=headers, timeout=90)
-        resp.raise_for_status()
-        return resp.json()
-    except http.exceptions.HTTPError as e:
-        # Try to get the response body for detailed error info
-        try:
-            err_data = e.response.json()
-            msg = err_data.get("message", "") or str(e)
-            return {"successful": False, "message": msg, "errorCode": err_data.get("errorCode", "")}
-        except Exception:
-            return {"successful": False, "message": str(e)}
+        data = resp.json()
+        # Supplier may use "successful" or "success" field
+        if not data.get("successful") and not data.get("success"):
+            if data.get("message"):
+                return {"successful": False, "message": data.get("message", ""), "errorCode": data.get("errorCode", "")}
+        return data
     except http.exceptions.Timeout:
         return {"successful": False, "message": "Request timed out — server is processing, check status shortly."}
     except http.exceptions.RequestException as e:
@@ -439,12 +435,19 @@ def list_orders():
     return jsonify([dict(r) for r in rows])
 
 
+@app.route("/api/orders/debug", methods=["POST"])
+@login_required
+def debug_order():
+    """Show exactly what would be sent to the supplier — for debugging."""
+    data = request.json or {}
+    body_str = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    return jsonify({"body_sent": body_str, "body_length": len(body_str), "keys_in_first_goods": list(data.get("goodsList", [{}])[0].keys()) if data.get("goodsList") else []})
+
+
 @app.route("/api/orders", methods=["POST"])
 @login_required
 def create_order():
     data = request.json or {}
-    # Log the payload for debugging
-    app.logger.info("placeOrder payload: %s", json.dumps(data, ensure_ascii=False)[:2000])
     result = supplier_post("/trade/api/interface/placeOrder", data)
     if not result.get("successful"):
         return jsonify({"success": False, "message": result.get("message", "Unknown error")}), 400
