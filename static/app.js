@@ -612,7 +612,12 @@ async function initNewOrder() {
             </div>
             <div>
               <label class="form-label">Carrier</label>
-              <input id="f-courier" class="form-input" placeholder="USPS / UPS / FedEx">
+              <select id="f-courier" class="form-input form-select">
+                <option value="">— Select Carrier —</option>
+                <option value="USPS">USPS</option>
+                <option value="UPS">UPS</option>
+                <option value="FedEx">FedEx</option>
+              </select>
             </div>
             <div class="col-span-2">
               <label class="form-label">Order Time *</label>
