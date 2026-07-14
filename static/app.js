@@ -961,8 +961,8 @@ async function submitNewOrder(e) {
     imageList: [
       { type: 1, imageUrl: item.printUrl, imageCode: item.printCode || `print_${oid}_${i}`, imageName: item.printCode || `print_${oid}_${i}` },
       { type: 2, imageUrl: item.mockupUrl, imageCode: item.mockupCode || `mockup_${oid}_${i}`, imageName: item.mockupCode || `mockup_${oid}_${i}` },
-      ...(item.printPosition === '1,2' && item.printBackUrl ? [{ type: 3, imageUrl: item.printBackUrl, imageCode: item.printBackCode || `printback_${oid}_${i}`, imageName: item.printBackCode || `printback_${oid}_${i}` }] : []),
-      ...(item.printPosition === '1,2' && item.mockupBackUrl ? [{ type: 4, imageUrl: item.mockupBackUrl, imageCode: item.mockupBackCode || `mockupback_${oid}_${i}`, imageName: item.mockupBackCode || `mockupback_${oid}_${i}` }] : []),
+      ...(item.printPosition === '1,2' && item.printBackUrl ? [{ type: 1, imageUrl: item.printBackUrl, imageCode: item.printBackCode || `printback_${oid}_${i}`, imageName: item.printBackCode || `printback_${oid}_${i}` }] : []),
+      ...(item.printPosition === '1,2' && item.mockupBackUrl ? [{ type: 2, imageUrl: item.mockupBackUrl, imageCode: item.mockupBackCode || `mockupback_${oid}_${i}`, imageName: item.mockupBackCode || `mockupback_${oid}_${i}` }] : []),
     ],
   }));
 
