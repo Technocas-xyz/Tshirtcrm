@@ -434,8 +434,12 @@ async function openPanel(oid) {
                 ${g.sizeCode  ? `<span class="bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full">${g.sizeCode}</span>` : ''}
                 <span class="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Qty: ${g.num||1}</span>
                 <span class="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full">${g.craftType===2?'DTG':'Heat Transfer'}</span>
+                ${g.printPosition ? `<span class="bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full">Print: ${g.printPosition==='1'?'Front':g.printPosition==='2'?'Back':'Front & Back'}</span>` : ''}
               </div>
+              ${g.specification ? `<p class="text-xs text-slate-500 mt-1.5"><span class="font-medium">Spec:</span> ${g.specification}</p>` : ''}
+              ${g.remark ? `<p class="text-xs text-slate-500 mt-0.5"><span class="font-medium">Remark:</span> ${g.remark}</p>` : ''}
               ${(g.imageList||[]).filter(im=>im.type===1).map(im=>`<img src="${im.imageUrl}" class="mt-2 h-20 rounded-lg object-cover border border-slate-100" onerror="this.style.display='none'" />`).join('')}
+              ${(g.imageList||[]).filter(im=>im.type===2).map(im=>`<img src="${im.imageUrl}" class="mt-2 h-20 rounded-lg object-cover border border-slate-100" onerror="this.style.display='none'" />`).join('')}
             </div>`).join('')}
         </div>
       </div>` : ''}
