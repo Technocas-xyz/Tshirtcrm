@@ -941,7 +941,7 @@ function buildOrderPayload() {
     }
     const entry = {
       platformOid: oid,
-      platformOlId: subOid,
+      platformOllId: subOid,
       goodsType: 1,
       title: item.title,
       goodsStatus: 'NOT_SHIPPED',
